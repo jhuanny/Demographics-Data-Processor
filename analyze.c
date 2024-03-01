@@ -73,14 +73,20 @@ int main(int argc, char *argv[]) {
 
     setCounties(demFile, &counties, &countNum);
     checkOps(opFile, counties, countNum);
-    free(counties);
+    //free counties if not already freed
+    if (counties != NULL) {
+        free(counties);  
+        counties = NULL; 
+    }
+    return 0;
 }
 
 
 void setCounties(FILE *demFile, County** counties, int* countNum){
     char line[2048]; //2048 for max possible line length
     //allocate memory for array of county structs
-    *counties = malloc(5000 * sizeof(County));
+    *counties = calloc(5000, sizeof(County));
+
     //check if malloc worked
     if (*counties == NULL){
         fprintf(stderr, "error with malloc in setCounties");
@@ -178,7 +184,7 @@ void checkOps(FILE* opFile, County* counties, int countNum){
 void stateFilter(County** counties, int* countNum, const char* state){
     int index = 0;
     //malloc temp array for correctly filtered matching states
-    County* temp = (County*)malloc((*countNum) * sizeof(County));
+    County* temp = (County*)calloc((*countNum), sizeof(County));
     if (temp == NULL) {
         fprintf(stderr, "malloc in stateFilter failed\n");
         return;
@@ -191,13 +197,14 @@ void stateFilter(County** counties, int* countNum, const char* state){
         }
     }
     //update num of counties and switch counties to filtered temp
+
+    //free(*counties);
     *counties = temp;
-    temp = NULL; //set to null so we don't accidentally use
     *countNum = index;
     printf("Filter: state == %s (%d entries)\n", state, index);
 }
 void filter(County** countiesPtr, int* countNum, const char* field, const char* op, double val) {
-    County* counties = *countiesPtr;
+    //County* counties = *countiesPtr;
     int count = 0; //count num of filtered counties
 
     //malloc temp array for correctly filtered counties
@@ -210,16 +217,17 @@ void filter(County** countiesPtr, int* countNum, const char* field, const char* 
     //for all the counties, check percent if the field matches
     for (int i = 0; i < *countNum; ++i) {
         //reset percent each time
-        double percent = getPercent(&counties[i], field);        
+        double percent = getPercent((*countiesPtr)+i, field);        
         //check operation type and if true add to filtered
         if ((strcmp(op, "ge") == 0 && percent >= val) ||
             (strcmp(op, "le") == 0 && percent <= val)) {
-            filtered[count++] = counties[i];
+            filtered[count++] = (*countiesPtr)[i];
         }
     }
     //change original counties to new filtered set
-    *countiesPtr = filtered;
-    filtered = NULL; //can't free since countiesptr is using it 
+    free(countiesPtr);
+    *countiesPtr = filtered; 
+    //can't free filtere since countiesptr is using it 
     *countNum =  count; //change original count to filtered count
 
     printf("Filter: %s %s %.2f (%d entries)\n", field, op, val, count);
@@ -257,7 +265,6 @@ void percents(County* counties, int countNum, const char* field) {
         subPopu += ((percent / 100.0) * counties[i].population_2014);
     }
 
-
     for (int i = 0; i < countNum; i++) {
         total += counties[i].population_2014;
     }
@@ -294,7 +301,7 @@ double getPercent(const County* county, const char* field) {
     } else if (strcmp(field, "Income.Persons Below Poverty Level") == 0) {
         return county->income_persons_below_poverty_level;
     }
-    return 999;
+    return 0.0;
 }
 void display(County *county) {
     //print based on format in assignment
